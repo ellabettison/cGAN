@@ -2,12 +2,18 @@ import argparse
 import datetime
 import os
 
+from tensorflow.keras.initializers import RandomNormal
+
 from data_loader import DataLoader
 import numpy as np
-from tensorflow.keras.layers import Conv2D, LeakyReLU, BatchNormalization, UpSampling2D, Dropout, Concatenate
-from tensorflow.keras import Input, Model
+from tensorflow.keras.layers import Conv2D, LeakyReLU, BatchNormalization, UpSampling2D, Dropout, Concatenate, \
+    Conv2DTranspose
+from tensorflow.keras import Input, Model, backend
 from tensorflow.keras.optimizers import Adam
 import matplotlib.pyplot as plt
+from tensorflow.python.client import device_lib
+print(device_lib.list_local_devices())
+log_device_placement = True
 
 
 def conv2d_layer(layer_inp, filters, batch_norm=True, strides=2):
@@ -19,25 +25,21 @@ def conv2d_layer(layer_inp, filters, batch_norm=True, strides=2):
 
 
 def deconv2d_layer(layer_input, skip_input, filters, dropout_rate=0, upsample_size=2, strides=1):
-    print(layer_input)
-    print(skip_input)
-    d = UpSampling2D(size=upsample_size)(layer_input)
-    print(d.shape)
-    d = Conv2D(filters, kernel_size=kernel_size, strides=strides, padding='same', activation='relu')(d)
-    print(d.shape)
+    d = Conv2DTranspose(filters, kernel_size=kernel_size, strides=2, padding='same')(layer_input)
     if dropout_rate:
         d = Dropout(dropout_rate)(d)
     d = BatchNormalization(momentum=0.8)(d)
-    print(d.shape)
     d = Concatenate()([d, skip_input])
     return d
 
 
 def define_discriminator():
+    init = RandomNormal(stddev=0.02)
+
     img_A = Input(shape=img_shape)
     img_B = Input(shape=img_shape)
 
-    combined_imgs = Concatenate(axix=-1)([img_A, img_B])
+    combined_imgs = Concatenate(axis=-1)([img_A, img_B])
 
     d1 = conv2d_layer(combined_imgs, dis_filters, batch_norm=False)
     d2 = conv2d_layer(d1, dis_filters * 2)
@@ -57,8 +59,6 @@ def define_discriminator():
 def define_generator():
     inp = Input(shape=img_shape)
 
-    print("input shape: ", inp.shape)
-
     # downsampling layers
     d1 = conv2d_layer(inp, gen_filters, batch_norm=False)
     d2 = conv2d_layer(d1, gen_filters * 2)
@@ -66,20 +66,13 @@ def define_generator():
     d4 = conv2d_layer(d3, gen_filters * 8)
     d5 = conv2d_layer(d4, gen_filters * 8)
     d6 = conv2d_layer(d5, gen_filters * 8)
-    print("d6 shape: ", d6.shape)
     d7 = conv2d_layer(d6, gen_filters * 8)
-
-    print("d7 shape: ", d7.shape)
 
     # upsampling layers
     u1 = deconv2d_layer(d7, d6, gen_filters * 8)
-    print("u1 shape: ", u1.shape)
     u2 = deconv2d_layer(u1, d5, gen_filters * 8)
-    print("u2 shape: ", u2.shape)
     u3 = deconv2d_layer(u2, d4, gen_filters * 8)
-    print("u3 shape: ", u3.shape)
     u4 = deconv2d_layer(u3, d3, gen_filters * 4)
-    print("u4 shape: ", u4.shape)
     u5 = deconv2d_layer(u4, d2, gen_filters * 2)
     u6 = deconv2d_layer(u5, d1, gen_filters)
 
@@ -100,11 +93,12 @@ def define_gan(g_model, d_model, opt):
     valid = d_model([fake_A, img_B])
 
     # should create valid output and recreate A?
-    gan = Model(inputs=[img_A, img_B], output=[valid, fake_A])
+    gan = Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
     # mae = mean absolute error
     # loss_weights - weight
     gan.compile(loss=['mse', 'mae'], loss_weights=[1, 100], optimizer=opt)
     return gan
+
 
 def train(g_model, d_model, gan_model):
     start_time = datetime.datetime.now()
@@ -135,9 +129,13 @@ def train(g_model, d_model, gan_model):
                                                                                                   elapsed_time))
 
             if batch_i % sample_interval == 0:
-                sample_images(epoch, batch_i)
+                sample_images(epoch, batch_i, g_model)
+            if epoch % model_save_interval == 0 and batch_i == 0:
+                g_model.save("models/model%d_%d" % (epoch, batch_i))
+
 
 def sample_images(epoch, batch_i, g_model):
+    print("saving figs")
     os.makedirs('images/%s' % dataset_name, exist_ok=True)
     r, c = 3, 3
 
@@ -159,7 +157,9 @@ def sample_images(epoch, batch_i, g_model):
             axs[i, j].axis('off')
             cnt += 1
     fig.savefig("images/%s/%d_%d.png" % (dataset_name, epoch, batch_i))
+    plt.show()
     plt.close()
+
 
 def define_parser():
     p = argparse.ArgumentParser()
@@ -178,17 +178,18 @@ if __name__ == '__main__':
     gen_filters = 64
     dis_filters = 64
     channels = 3
-    img_size = 28
+    img_size = 128
     kernel_size = 4
     img_shape = (img_size, img_size, channels)
     epochs = 100
     batch_size = 1
-    sample_interval = 50
+    sample_interval = 100
+    model_save_interval = 10
 
     patch = int(img_size / 2 ** 4)
     disc_patch = (patch, patch, 1)
 
-    dataset_name = 'facedes'
+    dataset_name = 'facades'
     data_loader = DataLoader(dataset_name=dataset_name,
                              img_res=(img_size, img_size))
 
