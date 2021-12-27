@@ -57,6 +57,7 @@ def define_discriminator():
 
 
 def define_generator():
+    init = RandomNormal(stddev=0.02)
     inp = Input(shape=img_shape)
 
     # downsampling layers
@@ -69,15 +70,16 @@ def define_generator():
     d7 = conv2d_layer(d6, gen_filters * 8)
 
     # upsampling layers
-    u1 = deconv2d_layer(d7, d6, gen_filters * 8)
-    u2 = deconv2d_layer(u1, d5, gen_filters * 8)
+    u1 = deconv2d_layer(d7, d6, gen_filters * 8, dropout_rate=0.5)
+    u2 = deconv2d_layer(u1, d5, gen_filters * 8, dropout_rate=0.5)
     u3 = deconv2d_layer(u2, d4, gen_filters * 8)
     u4 = deconv2d_layer(u3, d3, gen_filters * 4)
     u5 = deconv2d_layer(u4, d2, gen_filters * 2)
     u6 = deconv2d_layer(u5, d1, gen_filters)
 
-    u7 = UpSampling2D(size=2)(u6)
-    output_img = Conv2D(channels, kernel_size=kernel_size, strides=1, padding='same', activation='tanh')(u7)
+    # u7 = UpSampling2D(size=2)(u6)
+    # output_img = Conv2D(channels, kernel_size=kernel_size, strides=1, padding='same', activation='tanh', kernel_initializer=init)(u7)
+    output_img = Conv2DTranspose(channels, kernel_size=kernel_size, strides=(2, 2), padding='same', kernel_initializer=init)(u6)
 
     return Model(inp, output_img)
 
@@ -96,7 +98,7 @@ def define_gan(g_model, d_model, opt):
     gan = Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
     # mae = mean absolute error
     # loss_weights - weight
-    gan.compile(loss=['mse', 'mae'], loss_weights=[1, 100], optimizer=opt)
+    gan.compile(loss=['binary_crossentropy', 'mae'], loss_weights=[1, 100], optimizer=opt)
     return gan
 
 
@@ -156,7 +158,7 @@ def sample_images(epoch, batch_i, g_model):
             axs[i, j].set_title(titles[i])
             axs[i, j].axis('off')
             cnt += 1
-    fig.savefig("images/%s/%d_%d.png" % (dataset_name, epoch, batch_i))
+    # fig.savefig("images/%s/%d_%d.png" % (dataset_name, epoch, batch_i))
     plt.show()
     plt.close()
 
