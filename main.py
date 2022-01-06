@@ -2,6 +2,7 @@ import argparse
 import datetime
 import os
 
+from PIL import Image, ImageCms
 from tensorflow.keras.initializers import RandomNormal
 import tensorflow.keras as tf
 
@@ -18,10 +19,10 @@ log_device_placement = True
 
 
 def conv2d_layer(layer_inp, filters, batch_norm=True, strides=2):
-    c = Conv2D(filters, kernel_size=kernel_size, strides=strides, padding='same')(layer_inp)
-    c = LeakyReLU(alpha=0.2)(c)
+    c = Conv2D(filters, kernel_size=kernel_size, strides=strides, padding='same', use_bias=False)(layer_inp)
     if batch_norm:
         c = BatchNormalization(momentum=0.8)(c)
+    c = LeakyReLU(alpha=0.2)(c)
     return c
 
 
@@ -50,7 +51,7 @@ def define_discriminator():
     validity = Conv2D(1, kernel_size=4, strides=1, padding='same')(d4)
 
     model = Model([img_A, img_B], validity)
-    opt = Adam(0.0002, beta_1=0.5)
+    opt = Adam(args.lr, beta_1=0.5)
 
     model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
@@ -98,7 +99,7 @@ def define_gan(g_model, d_model, opt):
     # mae = mean absolute error
     # loss_weights - weight
     # mae
-    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), 'mae'], loss_weights=[1, 100], optimizer=opt)
+    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), 'mae'], loss_weights=[1, 10], optimizer=opt)
     return gan
 
 
@@ -166,9 +167,9 @@ def sample_images(epoch, batch_i, g_model):
 def define_parser():
     p = argparse.ArgumentParser()
     p.add_argument('--n_classes', type=int, default=10, help='Number of classes to generate')
-    p.add_argument('--image_size', type=int, default=28, help='Image width and height in pixels')
-    p.add_argument('--gen_filters', type=int, default=64, help='Number of filters for generator conv layers')
-    p.add_argument('--dis_filters', type=int, default=64, help='Number of filters for discriminator conv layers')
+    p.add_argument('--image_size', type=int, default=128, help='Image width and height in pixels')
+    p.add_argument('--lr', type=float, default=0.0002, help='Learning rate')
+    p.add_argument('--batch_size', type=int, default=4, help='Batch size')
     return p
 
 
@@ -184,18 +185,18 @@ if __name__ == '__main__':
     kernel_size = 4
     img_shape = (img_size, img_size, channels)
     epochs = 100
-    batch_size = 5 #1
+    batch_size = args.batch_size #1
     sample_interval = 10
-    model_save_interval = 10
+    model_save_interval = 1
 
     patch = int(img_size / 2 ** 4)
     disc_patch = (patch, patch, 1)
 
-    dataset_name = 'facades'
+    dataset_name = 'pokemon'
     data_loader = DataLoader(dataset_name=dataset_name,
                              img_res=(img_size, img_size))
 
-    opt = Adam(0.0002, 0.5)
+    opt = Adam(args.lr, 0.5)
 
     g_model = define_generator()
     d_model = define_discriminator()
