@@ -158,8 +158,8 @@ def sample_images(epoch, batch_i, g_model):
             axs[i, j].set_title(titles[i])
             axs[i, j].axis('off')
             cnt += 1
-    # fig.savefig("images/%s/%d_%d.png" % (dataset_name, epoch, batch_i))
-    plt.show()
+    fig.savefig("images/%s/%d_%d.png" % (dataset_name, epoch, batch_i))
+    #plt.show()
     plt.close()
 
 
@@ -183,9 +183,10 @@ if __name__ == '__main__':
     img_size = 128
     kernel_size = 4
     img_shape = (img_size, img_size, channels)
-    epochs = 100
     batch_size = 5 #1
-    sample_interval = 10
+    epochs = 500
+    batch_size = 1
+    sample_interval = 20
     model_save_interval = 10
 
     patch = int(img_size / 2 ** 4)
