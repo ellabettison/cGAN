@@ -3,6 +3,7 @@ import datetime
 import os
 
 from tensorflow.keras.initializers import RandomNormal
+import tensorflow.keras as tf
 
 from data_loader import DataLoader
 import numpy as np
@@ -24,7 +25,7 @@ def conv2d_layer(layer_inp, filters, batch_norm=True, strides=2):
     return c
 
 
-def deconv2d_layer(layer_input, skip_input, filters, dropout_rate=0, upsample_size=2, strides=1):
+def deconv2d_layer(layer_input, skip_input, filters, dropout_rate=0.0, upsample_size=2, strides=1):
     d = Conv2DTranspose(filters, kernel_size=kernel_size, strides=2, padding='same')(layer_input)
     if dropout_rate:
         d = Dropout(dropout_rate)(d)
@@ -51,7 +52,7 @@ def define_discriminator():
     model = Model([img_A, img_B], validity)
     opt = Adam(0.0002, beta_1=0.5)
 
-    model.compile(loss='mse', optimizer=opt, metrics=['accuracy'])
+    model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
 
     return model
 
@@ -77,8 +78,6 @@ def define_generator():
     u5 = deconv2d_layer(u4, d2, gen_filters * 2)
     u6 = deconv2d_layer(u5, d1, gen_filters)
 
-    # u7 = UpSampling2D(size=2)(u6)
-    # output_img = Conv2D(channels, kernel_size=kernel_size, strides=1, padding='same', activation='tanh', kernel_initializer=init)(u7)
     output_img = Conv2DTranspose(channels, kernel_size=kernel_size, strides=(2, 2), padding='same', kernel_initializer=init)(u6)
 
     return Model(inp, output_img)
@@ -98,7 +97,7 @@ def define_gan(g_model, d_model, opt):
     gan = Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
     # mae = mean absolute error
     # loss_weights - weight
-    gan.compile(loss=['binary_crossentropy', 'mae'], loss_weights=[1, 100], optimizer=opt)
+    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), 'mae'], loss_weights=[1, 100], optimizer=opt)
     return gan
 
 
