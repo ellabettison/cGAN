@@ -97,6 +97,7 @@ def define_gan(g_model, d_model, opt):
     gan = Model(inputs=[img_A, img_B], outputs=[valid, fake_A])
     # mae = mean absolute error
     # loss_weights - weight
+    # mae
     gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), 'mae'], loss_weights=[1, 100], optimizer=opt)
     return gan
 
@@ -183,8 +184,8 @@ if __name__ == '__main__':
     kernel_size = 4
     img_shape = (img_size, img_size, channels)
     epochs = 100
-    batch_size = 1
-    sample_interval = 100
+    batch_size = 5 #1
+    sample_interval = 10
     model_save_interval = 10
 
     patch = int(img_size / 2 ** 4)
