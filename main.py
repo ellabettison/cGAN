@@ -139,7 +139,7 @@ def train(g_model, d_model, gan_model):
 
 def sample_images(epoch, batch_i, g_model):
     print("saving figs")
-    os.makedirs('images/%s' % dataset_name, exist_ok=True)
+    os.makedirs('%s/%s' % (output_loc, dataset_name), exist_ok=True)
     r, c = 3, 3
 
     imgs_A, imgs_B = data_loader.load_data(batch_size=3, is_testing=True)
@@ -171,6 +171,7 @@ def define_parser():
     p.add_argument('--lr', type=float, default=0.0002, help='Learning rate')
     p.add_argument('--batch_size', type=int, default=4, help='Batch size')
     p.add_argument('--l1_balance', type=int, default=100, help='L1 balance')
+    p.add_argument('--o', type=str, default="images", help='L1 balance')
     return p
 
 
@@ -190,6 +191,7 @@ if __name__ == '__main__':
     sample_interval = 10
     model_save_interval = 1
     l1_balance = args.l1_balance
+    output_loc = args.o
 
     patch = int(img_size / 2 ** 4)
     disc_patch = (patch, patch, 1)
