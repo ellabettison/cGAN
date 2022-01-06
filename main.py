@@ -99,7 +99,7 @@ def define_gan(g_model, d_model, opt):
     # mae = mean absolute error
     # loss_weights - weight
     # mae
-    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), 'mae'], loss_weights=[1, 10], optimizer=opt)
+    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), 'mae'], loss_weights=[1, l1_balance], optimizer=opt)
     return gan
 
 
@@ -170,6 +170,7 @@ def define_parser():
     p.add_argument('--image_size', type=int, default=128, help='Image width and height in pixels')
     p.add_argument('--lr', type=float, default=0.0002, help='Learning rate')
     p.add_argument('--batch_size', type=int, default=4, help='Batch size')
+    p.add_argument('--l1_balance', type=int, default=100, help='L1 balance')
     return p
 
 
@@ -184,10 +185,11 @@ if __name__ == '__main__':
     img_size = 128
     kernel_size = 4
     img_shape = (img_size, img_size, channels)
-    epochs = 100
+    epochs = 20
     batch_size = args.batch_size #1
     sample_interval = 10
     model_save_interval = 1
+    l1_balance = args.l1_balance
 
     patch = int(img_size / 2 ** 4)
     disc_patch = (patch, patch, 1)
