@@ -2,6 +2,8 @@ import argparse
 import datetime
 import os
 
+import skimage
+import tensorflow.python.ops.summary_ops_v2
 from PIL import Image, ImageCms
 from tensorflow.keras.initializers import RandomNormal
 import tensorflow.keras as tf
@@ -27,7 +29,7 @@ def conv2d_layer(layer_inp, filters, batch_norm=True, strides=2):
 
 
 def deconv2d_layer(layer_input, skip_input, filters, dropout_rate=0.0, upsample_size=2, strides=1):
-    d = Conv2DTranspose(filters, kernel_size=kernel_size, strides=2, padding='same')(layer_input)
+    d = Conv2DTranspose(filters, kernel_size=kernel_size, strides=2, padding='same', activation='relu')(layer_input)
     if dropout_rate:
         d = Dropout(dropout_rate)(d)
     d = BatchNormalization(momentum=0.8)(d)
@@ -99,8 +101,14 @@ def define_gan(g_model, d_model, opt):
     # mae = mean absolute error
     # loss_weights - weight
     # mae
-    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), 'mae'], loss_weights=[1, l1_balance], optimizer=opt)
+    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), bw_l1_loss], loss_weights=[1, l1_balance], optimizer=opt)
     return gan
+
+
+def bw_l1_loss(y_true, y_pred):
+    y_true_bw = tensorflow.image.rgb_to_grayscale(y_true) #np.dot(y_true.numpy()[..., :3], [0.2989, 0.5870, 0.1140])
+    y_pred_bw = tensorflow.image.rgb_to_grayscale(y_pred) #np.dot(y_pred[..., :3], [0.2989, 0.5870, 0.1140])
+    return tf.losses.mae(y_true_bw, y_pred_bw)
 
 
 def train(g_model, d_model, gan_model):
