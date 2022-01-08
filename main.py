@@ -2,11 +2,9 @@ import argparse
 import datetime
 import os
 
-import skimage
 import tensorflow.python.ops.summary_ops_v2
-from PIL import Image, ImageCms
 from tensorflow.keras.initializers import RandomNormal
-import tensorflow.keras as tf
+from tensorflow.keras.losses import BinaryCrossentropy, mae
 
 from data_loader import DataLoader
 import numpy as np
@@ -28,8 +26,8 @@ def conv2d_layer(layer_inp, filters, batch_norm=True, strides=2):
     return c
 
 
-def deconv2d_layer(layer_input, skip_input, filters, dropout_rate=0.0, upsample_size=2, strides=1):
-    d = Conv2DTranspose(filters, kernel_size=kernel_size, strides=2, padding='same', activation='relu')(layer_input)
+def deconv2d_layer(layer_input, skip_input, filters, dropout_rate=0.0, strides=2):
+    d = Conv2DTranspose(filters, kernel_size=kernel_size, strides=strides, padding='same', activation='relu')(layer_input)
     if dropout_rate:
         d = Dropout(dropout_rate)(d)
     d = BatchNormalization(momentum=0.8)(d)
@@ -72,16 +70,17 @@ def define_generator():
     d5 = conv2d_layer(d4, gen_filters * 8)
     d6 = conv2d_layer(d5, gen_filters * 8)
     d7 = conv2d_layer(d6, gen_filters * 8)
+    # d7 = conv2d_layer(d6, gen_filters * 8)
 
     # upsampling layers
     u1 = deconv2d_layer(d7, d6, gen_filters * 8, dropout_rate=0.5)
     u2 = deconv2d_layer(u1, d5, gen_filters * 8, dropout_rate=0.5)
-    u3 = deconv2d_layer(u2, d4, gen_filters * 8)
-    u4 = deconv2d_layer(u3, d3, gen_filters * 4)
-    u5 = deconv2d_layer(u4, d2, gen_filters * 2)
-    u6 = deconv2d_layer(u5, d1, gen_filters)
+    u3 = deconv2d_layer(u2, d4, gen_filters * 8, dropout_rate=0.5)
+    u4 = deconv2d_layer(u3, d3, gen_filters * 8)
+    u5 = deconv2d_layer(u4, d2, gen_filters * 4)
+    u6 = deconv2d_layer(u5, d1, gen_filters * 2)
 
-    output_img = Conv2DTranspose(channels, kernel_size=kernel_size, strides=(2, 2), padding='same', kernel_initializer=init)(u6)
+    output_img = Conv2DTranspose(channels, kernel_size=kernel_size, strides=(2, 2), padding='same', kernel_initializer=init, activation='tanh')(u6)
 
     return Model(inp, output_img)
 
@@ -101,14 +100,14 @@ def define_gan(g_model, d_model, opt):
     # mae = mean absolute error
     # loss_weights - weight
     # mae
-    gan.compile(loss=[tf.losses.BinaryCrossentropy(from_logits=True), bw_l1_loss], loss_weights=[1, l1_balance], optimizer=opt)
+    gan.compile(loss=[BinaryCrossentropy(from_logits=True), bw_l1_loss], loss_weights=[1, l1_balance], optimizer=opt)
     return gan
 
 
 def bw_l1_loss(y_true, y_pred):
     y_true_bw = tensorflow.image.rgb_to_grayscale(y_true) #np.dot(y_true.numpy()[..., :3], [0.2989, 0.5870, 0.1140])
     y_pred_bw = tensorflow.image.rgb_to_grayscale(y_pred) #np.dot(y_pred[..., :3], [0.2989, 0.5870, 0.1140])
-    return tf.losses.mae(y_true_bw, y_pred_bw)
+    return mae(y_true_bw, y_pred_bw)
 
 
 def train(g_model, d_model, gan_model):
