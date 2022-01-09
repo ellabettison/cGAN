@@ -1,10 +1,7 @@
 import random
 from glob import glob
 import numpy as np
-import scipy
-import skimage
-from PIL import Image, ImageCms
-from skimage import color, io
+from PIL import Image
 
 
 class DataLoader:
@@ -13,16 +10,17 @@ class DataLoader:
         self.img_res = img_res
 
         # Convert to Lab colourspace
-        srgb_p = ImageCms.createProfile("sRGB")
-        lab_p = ImageCms.createProfile("LAB")
-
-        self.rgb2lab = ImageCms.buildTransformFromOpenProfiles(srgb_p, lab_p, "RGB", "LAB")
-        self.lab2rgb = ImageCms.buildTransformFromOpenProfiles(lab_p, srgb_p, "LAB", "RGB")
+        # srgb_p = ImageCms.createProfile("sRGB")
+        # lab_p = ImageCms.createProfile("LAB")
+        #
+        # self.rgb2lab = ImageCms.buildTransformFromOpenProfiles(srgb_p, lab_p, "RGB", "LAB")
+        # self.lab2rgb = ImageCms.buildTransformFromOpenProfiles(lab_p, srgb_p, "LAB", "RGB")
 
     def load_data(self, batch_size=1, is_testing=False):
         data_type = "train" if not is_testing else "test"
         path = glob('./datasets/%s/%s/*' % (self.dataset_name, data_type))
 
+        random.shuffle(path)
         batch_images = np.random.choice(path, size=batch_size)
 
         imgs_A = []
