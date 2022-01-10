@@ -5,9 +5,9 @@ import os
 import tensorflow.python.ops.summary_ops_v2
 from tensorflow.keras.initializers import RandomNormal
 from tensorflow.keras.losses import BinaryCrossentropy, mae
-from tensorflow.python.keras.constraints import Constraint
-from tensorflow.python.keras.layers import Activation
-from tensorflow.python.keras.optimizer_v2.rmsprop import RMSProp
+from tensorflow.keras.constraints import Constraint
+from tensorflow.keras.layers import Activation
+from tensorflow.keras.optimizers import RMSprop
 
 from data_loader import DataLoader
 import numpy as np
@@ -71,7 +71,7 @@ def define_discriminator():
 
     model = Model([img_A, img_B], validity)
     # opt = Adam(args.lr, beta_1=0.5)
-    opt = RMSProp(args.lr)
+    opt = RMSprop(args.lr)
 
     # model.compile(loss='binary_crossentropy', optimizer=opt, metrics=['accuracy'])
     model.compile(loss=wasserstein_loss, optimizer=opt, metrics=['accuracy'])
@@ -127,7 +127,7 @@ def define_gan(g_model, d_model, opt):
     # mae
     # gan.compile(loss=[BinaryCrossentropy(from_logits=True), mae], loss_weights=[100, l1_balance], optimizer=opt)
     # wasserstein
-    gan.compile(loss=[wasserstein_loss, mae], loss_weights=[1, l1_balance], optimizer=opt)
+    gan.compile(loss=[wasserstein_loss, colour_ratio_l1_loss], loss_weights=[1, l1_balance], optimizer=opt)
     return gan
 
 
@@ -138,13 +138,12 @@ def bw_l1_loss(y_true, y_pred):
 
 
 def colour_ratio_l1_loss(y_true, y_pred):
-    print(y_true.shape) # (b, x, y, c)
-    print(y_true)
-    print(y_true[0,0,0].numpy())
-    y_true_ordered = [np.sort(y_true[b,x,y]) for (b,x,y) in np.ndindex((batch_size, img_size, img_size))]
-    print(y_true_ordered[0,0,0])
-    y_pred_ordered = [np.sort(y_pred[b,x,y]) for (b,x,y) in np.ndindex((batch_size, img_size, img_size))]
-    return wasserstein_loss(y_true_ordered, y_pred_ordered)
+    y_true_max = tensorflow.reduce_max(y_true, reduction_indices=[-1])
+    y_pred_max = tensorflow.reduce_max(y_pred, reduction_indices=[-1])
+
+    y_true_min = tensorflow.reduce_min(y_true, reduction_indices=[-1])
+    y_pred_min = tensorflow.reduce_min(y_pred, reduction_indices=[-1])
+    return mae(y_true_max, y_pred_max) + mae(y_true_min, y_pred_min)
 
 
 def wasserstein_loss(y_true, y_pred):
@@ -199,7 +198,7 @@ def sample_images(epoch, batch_i, g_model):
 
     gen_imgs = np.concatenate([imgs_B, fake_A, imgs_A])
 
-    # print(fake_A)
+    print(fake_A)
 
     # Rescale images 0 - 1
     gen_imgs = 0.5 * gen_imgs + 0.5
@@ -224,7 +223,7 @@ def define_parser():
     p.add_argument('--image_size', type=int, default=128, help='Image width and height in pixels')
     p.add_argument('--lr', type=float, default=0.00005, help='Learning rate')
     p.add_argument('--batch_size', type=int, default=4, help='Batch size')
-    p.add_argument('--l1_balance', type=int, default=10, help='L1 balance')
+    p.add_argument('--l1_balance', type=int, default=100, help='L1 balance')
     p.add_argument('--o', type=str, default="images", help='L1 balance')
     return p
 
@@ -256,8 +255,10 @@ if __name__ == '__main__':
                              img_res=(img_size, img_size))
 
     # opt = Adam(args.lr, 0.5)
-    opt = RMSProp(lr=args.lr)
+    opt = RMSprop(lr=args.lr)
     ct = ClipConstraint(0.01)
+
+    sess = backend.get_session()
 
     g_model = define_generator()
     d_model = define_discriminator()
